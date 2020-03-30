@@ -1,0 +1,99 @@
+---
+title: "Proportion of Parcels Under Irrigation County Estimates 2005-2006"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: fill
+    orientation: rows
+    
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+require(magrittr)
+require(tidyr)
+require(dplyr)
+require(ggthemes)
+require(ggplot2)
+require(stringr)
+require(DT)
+theme_set(theme_minimal())
+load(file = "irrigation.Rdata")
+```
+
+County Totals {data-icon="fa-bar-chart"}
+===================================== 
+
+```{r}
+irrigation <- Proportion_of_Parcels_under_Irrigation_County_Estimates_20056 %>% 
+  select(-OBJECTID) %>% 
+   filter(County != "Kenya average") %>%
+  mutate(text = paste("County: ", County, "\nPercent: ", Percent, 
+                       "\nTotal Count: ", Total_Count)) %>%
+  mutate(County = factor(County, County)) %>% 
+  mutate(Percent = str_replace(
+    Proportion_of_Parcels_under_Irrigation_County_Estimates_20056$Percent[1:47], "%", " ")) %>%
+  arrange(Total_Count) %>% 
+  mutate(Percent = as.numeric(Percent)) %>% 
+   separate(Location_1, into = c("lattitude", "longitude"), sep = ",") %>% 
+  mutate(lattitude = str_replace(lattitude, "\\(", " ")) %>%
+  mutate(longitude = str_replace(longitude, "\\)", " ")) %>% 
+  mutate(longitude = as.numeric(longitude)) %>% 
+  mutate(lattitude = as.numeric(lattitude)) %>%
+  janitor::clean_names() 
+
+
+
+gauge(value = round(mean(irrigation$percent), digits = 2), symbol = "%", min = 0, max = 100, 
+      gaugeSectors(danger = c(0,39), warning = c(40,79), success = c(80,100)),
+      label = "Average Percentage \n Proportion of Parcels \n under Irrigation")
+
+
+
+ normalize <- function(x){return((x-min(x))/(max(x)-min(x)))}
+ 
+ 
+  ggplot(irrigation, aes(county, total_count))+
+    geom_bar(stat = "identity", fill = "blue")+
+    geom_text(aes(label = total_count), color = "black", size = 3, hjust = -0.5)+
+    ggtitle("Total number of Visitors in kenya as per County levels")+
+    xlab("County")+
+    ylab("Total Count")+
+    coord_flip()
+  
+  
+  
+
+```
+
+
+
+Kenya map {data-icon="fa-bar-chart"}
+===================================== 
+
+```{r}
+require(maps)
+world <- map_data("world")
+
+Kenya <- subset(world, world$region=="Kenya")
+
+plt <- ggplot()+ coord_fixed()+
+  xlab("")+ ylab("")
+
+base_ke <- plt+ geom_polygon(data = Kenya, aes(x = long, y = lat, group = group), 
+                              color = "light green", fill = "light green")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_rect(colour = "white", fill = "white"),
+        axis.line = element_line(colour = "white"), legend.position="none",
+        axis.ticks=element_blank(), axis.text.x=element_blank(),
+        axis.text.y=element_blank())
+
+map_ke <- base_ke+
+  geom_point(data = irrigation, aes(x = longitude, y = lattitude, size = total_count, text = text), 
+             colour = "deep pink", fill = "pink",
+             pch = 21, alpha = I(0.7))+
+  ggtitle("Proportion of Parcels Under Irrigation County Estimates 2005-2006 in Kenya")
+
+graph = plotly::ggplotly(map_ke, tooltip = "text")
+graph
+```
+
